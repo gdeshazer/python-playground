@@ -1,6 +1,6 @@
 import numpy
 
-from board import Move
+from move import Move
 
 
 class Pin:
@@ -21,7 +21,7 @@ class Pin:
         :param move: the move to compare against
         :return: true if the move should not be allowed
         """
-        matching_piece = move.piece_moved == self.piece
+        matching_piece = move.piece.full_name() == self.piece
 
         if not matching_piece:
             return False

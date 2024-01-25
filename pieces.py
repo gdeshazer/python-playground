@@ -41,8 +41,14 @@ class Piece(ABC):
         # if move.cl
         pass
 
-    def id(self, position: Union[np.ndarray, list[int]]) -> str:
+    def position_id(self, position: Union[np.ndarray, list[int]]) -> str:
         return f'{self.color}{self.name}-{position[0]}{position[1]}'
+
+    # todo: there should be a better way to handle this to, maybe the piece should store it's current position?
+    def id_to_position(self, id_str: str) -> np.ndarray[np.int8]:
+        # noinspection PyTypeChecker
+        return np.array([int(id_str[-2]), int(id_str[-1])], dtype=np.int8)
+
 
     def full_name(self) -> str:
         return f'{self.color}{self.name}'
@@ -81,7 +87,7 @@ class Pawn(Piece):
                              directions: np.ndarray,
                              is_in_start: bool,
                              capture_color: str) -> list:
-        from board import Move
+        from move import Move
         moves: list = []
 
         for direction in directions:
