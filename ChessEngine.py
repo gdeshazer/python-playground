@@ -6,8 +6,8 @@ from typing import List, Tuple, Union
 
 import numpy
 
-from Chess.Move import Move
-from Chess.Pin import Pin
+from board import Move
+from pin import Pin
 
 type MovePair = tuple[numpy.ndarray[numpy.int8], numpy.ndarray[numpy.int8]]
 
@@ -28,12 +28,12 @@ class GameState:
         # board is drawn from white's perspective
         self.board: List[List[str]] = [
             ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-            ["bp", "bp", "bp", "--", "bp", "bp", "bp", "bp"],
+            ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["wp", "wp", "wp", "wp", "--", "wp", "wp", "wp"],
+            ["wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp"],
             ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
         ]
 
@@ -53,18 +53,18 @@ class GameState:
 
     def make_move(self, move: Move) -> None:
         """
-        takes a move as a parameter and does the move, does not work for castling, pawn promition, and en-passant
+        takes a move as a parameter and does the move, does not work for castling, pawn promotion, and en-passant
         :param move:
         :return: none
         """
         self.board[move.start_row()][move.start_col()] = "--"
-        self.board[move.end_row()][move.end_col()] = move.piece_moved
+        self.board[move.end_row()][move.end_col()] = move.piece.full_name()
         self.moveLog.append(move)
         self.whiteToMove = not self.whiteToMove
 
-        if move.piece_moved == 'wK':
+        if move.piece.full_name() == 'wK':
             self.whiteKingLocation = move.end_position
-        elif move.piece_moved == 'bK':
+        elif move.piece.full_name() == 'bK':
             self.blackKingLocation = move.end_position
 
     def undo_move(self) -> None:
@@ -74,13 +74,13 @@ class GameState:
         """
         if len(self.moveLog) != 0:
             move = self.moveLog.pop()
-            self.board[move.start_row()][move.start_col()] = move.piece_moved
-            self.board[move.end_row()][move.end_col()] = move.piece_captured
+            self.board[move.start_row()][move.start_col()] = move.piece.full_name()
+            self.board[move.end_row()][move.end_col()] = move.capture.full_name()
             self.whiteToMove = not self.whiteToMove
 
-            if move.piece_moved == 'wK':
+            if move.piece.full_name() == 'wK':
                 self.whiteKingLocation = move.start_position
-            elif move.piece_moved == 'bK':
+            elif move.piece.full_name() == 'bK':
                 self.blackKingLocation = move.start_position
 
     def get_valid_moves(self) -> List[Move]:
@@ -117,7 +117,7 @@ class GameState:
 
                 for move in possible_moves:
                     move_in_valid_list = self.is_in(move.end_position, valid_squares)
-                    if move.piece_moved[1] == 'K':
+                    if move.piece.name == 'K':
                         if not move_in_valid_list:
                             moves.append(move)
                         else:

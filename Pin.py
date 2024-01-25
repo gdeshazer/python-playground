@@ -1,6 +1,6 @@
 import numpy
 
-from Chess.Move import Move
+from board import Move
 
 
 class Pin:
