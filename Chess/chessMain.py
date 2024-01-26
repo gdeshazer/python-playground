@@ -19,13 +19,27 @@ MAX_FPS = 15  # for animations later on
 IMAGES = {}
 
 
+def resolve_path(filename):
+    """
+    Resolve the path of the given filename relative to the current file
+    :param filename: the name of the file
+    :return: the resolved path
+    """
+    import os
+
+    base_path = os.path.dirname(os.path.abspath(__file__))
+    relative_path = os.path.join(base_path, filename)
+    return os.path.abspath(relative_path)
+
+
 def load_images():
     """
     Initialize global dictionary of images, called exactly once in main
     """
-    pieces = ["wp", "wR", "wN", "wB", "wQ", "wK", "bp", "bR", "bN", "bB", "bQ", "bK"]
+    pieces = ["wP", "wR", "wN", "wB", "wQ", "wK", "bP", "bR", "bN", "bB", "bQ", "bK"]
     for piece in pieces:
-        IMAGES[piece] = pygame.transform.scale(pygame.image.load("images/" + piece + ".png"), (SQ_SIZE, SQ_SIZE))
+        path = resolve_path(f'./images/{piece}.png')
+        IMAGES[piece] = pygame.transform.scale(pygame.image.load(path), (SQ_SIZE, SQ_SIZE))
 
 
 def main():

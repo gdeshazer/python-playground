@@ -9,11 +9,12 @@ class Piece(ABC):
     def __init__(self, color: str, name: str) -> None:
         self.color = color
         self.name = name
-        self.isPinned = False
+        self.is_pinned = False
 
     @classmethod
     def from_str(cls, name: str) -> "Piece":
-        piece_type = name[1]
+        # convert to upper case just incase
+        piece_type = name[1].upper()
         color = name[0]
 
         if piece_type == 'R':
@@ -26,7 +27,7 @@ class Piece(ABC):
             return Queen(color)
         elif piece_type == 'K':
             return King(color)
-        elif piece_type == 'p':
+        elif piece_type == 'P':
             return Pawn(color)
         elif piece_type == "-":
             return Empty()
@@ -35,10 +36,6 @@ class Piece(ABC):
 
     @abstractmethod
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        pass
-
-    def make_move(self, board: list[list[str]], move) -> None:
-        # if move.cl
         pass
 
     def position_id(self, position: Union[np.ndarray, list[int]]) -> str:
@@ -57,6 +54,44 @@ class Piece(ABC):
             return self.name.upper()
         else:
             return self.name.lower()
+
+    def build_moves_from_directions(self,
+                                    start: np.ndarray,
+                                    directions: np.ndarray,
+                                    magnitudes: np.ndarray,
+                                    board) -> list:
+        """
+        create a list of moves based on a starting position, a set of direction vectors ie: [ [1,0], [0,1] ] and a
+        set of magnitudes, ie: [1, 2, 3, 4] (basically how far to move in a given direction)
+        :return: list of possible moves for all magnitudes and directions
+        """
+        from Chess.move import Move
+        moves = []
+        enemy_color = 'b' if self.color == 'w' else 'w'
+
+        for direction in directions:
+            for magnitude in magnitudes:
+                dir_vector = np.multiply(direction, magnitude)
+                move_vector = np.add(start, dir_vector)
+
+                # check out of bounds
+                if np.any(move_vector > 7) or np.any(move_vector < 0):
+                    break
+
+                target = board.piece_at(move_vector)
+
+                if isinstance(target, Empty):
+                    moves.append(Move(start, move_vector, direction, board))
+                    continue
+                elif target.color == enemy_color:
+                    # we don't need to look any further in this direction
+                    moves.append(Move(start, move_vector, direction, board))
+                    break
+                else:
+                    # we are blocked by one of our own pieces so no need to look further in this direction
+                    break
+
+        return moves
 
     def __str__(self):
         return self.full_name()
@@ -78,7 +113,7 @@ class Pawn(Piece):
     BLACK_DIRECTIONS: np.ndarray[np.int8] = np.array([[1, 0], [1, 1], [1, -1]], np.int8)
 
     def __init__(self, color: str) -> None:
-        super().__init__(color, 'p')
+        super().__init__(color, 'P')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
         if self.color == 'w':
@@ -110,12 +145,13 @@ class Pawn(Piece):
                 if isinstance(target, Empty):
                     moves.append(Move(start, endpoint, direction, board))
 
-                # pawns in their starting row can move two spaces forward
-                if is_in_start:
-                    additional_move = np.add(endpoint, direction)
-                    new_target = board.piece_at([additional_move[0], additional_move[1]])
-                    if isinstance(new_target, Empty):
-                        moves.append(Move(start, additional_move, direction, board))
+                    # pawns in their starting row can move two spaces forward, but they can't hop anything
+                    # so if we didn't add a move for the pawn to move forward once, we can't add one to move twice
+                    if is_in_start:
+                        additional_move = np.add(endpoint, direction)
+                        new_target = board.piece_at([additional_move[0], additional_move[1]])
+                        if isinstance(new_target, Empty):
+                            moves.append(Move(start, additional_move, direction, board))
 
             # moving in diagonals to capture
             elif target.color == capture_color:
@@ -125,40 +161,65 @@ class Pawn(Piece):
 
 
 class Bishop(Piece):
+    DIRECTIONS = np.array([[1, 1], [1, -1], [-1, 1], [-1, -1]], np.int8)
+    MAGNITUDES = np.arange(1, 8)
+
     def __init__(self, color: str) -> None:
         super().__init__(color, 'B')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        return []
+        return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)
 
 
 class Knight(Piece):
+    DIRECTIONS = np.array([
+        [2, 1],
+        [2, -1],
+        [-2, 1],
+        [-2, -1],
+        [1, 2],
+        [1, -2],
+        [-1, 2],
+        [-1, -2]
+    ], np.int8)
+    MAGNITUDES = np.array([1])
+
     def __init__(self, color: str) -> None:
-        super().__init__(color, 'K')
+        super().__init__(color, 'N')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        return []
+        return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)
 
 
 class Rook(Piece):
+    DIRECTIONS = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], np.int8)
+    MAGNITUDES = np.arange(1, 8)
+
     def __init__(self, color: str) -> None:
         super().__init__(color, 'R')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        return []
+        return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)
 
 
 class Queen(Piece):
+    DIRECTIONS = np.array([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], np.int8)
+    MAGNITUDES = np.arange(1, 8)
+
     def __init__(self, color: str) -> None:
         super().__init__(color, 'Q')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        return []
+        return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)
 
 
 class King(Piece):
+    DIRECTIONS = np.array([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], np.int8)
+    MAGNITUDES = np.array([1])
+
     def __init__(self, color: str) -> None:
         super().__init__(color, 'K')
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        return []
+        # todo: need to ensure that the move being made does not place the king in check
+        return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)

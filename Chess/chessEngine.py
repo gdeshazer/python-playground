@@ -28,18 +28,18 @@ class GameState:
         # board is drawn from white's perspective
         self.board: List[List[str]] = [
             ["bR", "bN", "bB", "bQ", "bK", "bB", "bN", "bR"],
-            ["bp", "bp", "bp", "bp", "bp", "bp", "bp", "bp"],
+            ["bP", "bP", "bP", "bP", "bP", "bP", "bP", "bP"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
             ["--", "--", "--", "--", "--", "--", "--", "--"],
-            ["wp", "wp", "wp", "wp", "wp", "wp", "wp", "wp"],
+            ["wP", "wP", "wP", "wP", "wP", "wP", "wP", "wP"],
             ["wR", "wN", "wB", "wQ", "wK", "wB", "wN", "wR"],
         ]
 
         self.whiteToMove: bool = True
         self.moveLog: List[Move] = []
-        self.move_funcs = {'p': self.get_pawn_moves,
+        self.move_funcs = {'P': self.get_pawn_moves,
                            'R': self.get_rook_moves,
                            'N': self.get_knight_moves,
                            'B': self.get_bishop_moves,
