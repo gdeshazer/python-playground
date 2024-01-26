@@ -15,10 +15,10 @@ class Board:
         self.board: list[list[Piece]] = [
             [Rook('b'), Knight('b'), Bishop('b'), Queen('b'), King('b'), Bishop('b'), Knight('b'), Rook('b')],
             [Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b')],
-            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
-            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
-            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
-            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
+            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
+            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
+            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
+            [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
             [Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w')],
             [Rook('w'), Knight('w'), Bishop('w'), Queen('w'), King('w'), Bishop('w'), Knight('w'), Rook('w')],
         ]
@@ -29,14 +29,62 @@ class Board:
         self.white_king: King = cast(King, self.board[7][4])
         self.black_king: King = cast(King, self.board[0][4])
 
+        self.rebuild_piece_index()
+        self.get_all_valid_moves()
+
+    @classmethod
+    def new_from_fen(cls, fen: str) -> "Board":
+        """
+        initialize the board from the provided FEN.  this should allow for starting the board in a specific state (good
+        for testing), but that state may or may not actually be reachable
+        :return: a new board based on the current fen string
+        """
+        # a fen should look like this (standard starting position): rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1
+        # splitting will give us [ rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR, w, KQkq, -, 0, 1 ]
+        fen_parts = fen.split()
+
+        # this will have [ rnbqkbnr, pppppppp, 8, 8, 8, 8, PPPPPPPP, RNBQKBNR ]
+        row_strs = fen_parts[0].split('/')
+        board = cls()
+        board.board = [[Empty() for _ in range(8)] for _ in range(8)]
+
+        for row in range(len(row_strs)):
+            row_str = row_strs[row]
+            insert_column = 0
+
+            for c in range(len(row_str)):
+                if row_str[c].isdigit():
+                    insert_column += int(row_str[c])
+                else:
+                    color = 'w' if row_str[c].isupper() else 'b'
+                    piece = Piece.from_str(f'{color}{row_str[c]}')
+                    board.board[row][insert_column] = piece
+
+                    if isinstance(piece, King):
+                        if color == 'w':
+                            board.white_king = piece
+                        else:
+                            board.black_king = piece
+
+                    insert_column += 1
+
+            if insert_column != 8:
+                raise ValueError(f"Invalid FEN string: {fen}")
+
+        board.white_to_move = fen_parts[1] == 'w'
+        board.rebuild_piece_index()
+        board.get_all_valid_moves()
+
+        return board
+
+    def rebuild_piece_index(self):
+        self.piece_index = {}
         for r in range(len(self.board)):
             for c in range(len(self.board[r])):
                 piece = self.piece_at([r, c])
                 if not isinstance(piece, Empty):
                     index = piece.position_id([r, c])
                     self.piece_index[index] = piece
-
-        self.get_all_valid_moves()
 
     def make_move(self, move: Move) -> bool:
         """
