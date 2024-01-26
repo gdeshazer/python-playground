@@ -18,7 +18,7 @@ class Move:
                  end_square: np.ndarray[np.int8],
                  direction: np.ndarray[np.int8],
                  board) -> None:
-        from pieces import Piece
+        from Chess.pieces import Piece
         self.start_position: np.ndarray[np.int8] = start_square
         self.end_position: np.ndarray[np.int8] = end_square
         self.direction: np.ndarray[np.int8] = direction
@@ -75,10 +75,7 @@ class Move:
         return self.end_position[1]
 
     def __eq__(self, other):
-        if isinstance(other, Move):
-            return self.move_id == other.move_id
-
-        return False
+        return type(other) is type(self) and self.move_id == other.move_id
 
     def __str__(self):
         return f'MoveId: {self.move_id} | Piece: {self.piece.color}{self.piece.name} | Direction: {self.direction}'

@@ -7,8 +7,10 @@ the guide this is derived from.  The images for the chess pieces are also source
 
 import pygame
 
-from board import Board, Move
-from chessEngine import GameState
+from Chess.board import Board
+# this is the old engine
+from Chess.chessEngine import GameState
+from Chess.move import Move
 
 WIDTH = HEIGHT = 512
 DIMENSION = 8  # boards are 8 by 8

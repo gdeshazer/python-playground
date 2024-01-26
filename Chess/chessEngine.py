@@ -6,8 +6,8 @@ from typing import List, Tuple, Union
 
 import numpy
 
-from move import Move
-from pin import Pin
+from Chess.move import Move
+from Chess.pin import Pin
 
 type MovePair = tuple[numpy.ndarray[numpy.int8], numpy.ndarray[numpy.int8]]
 

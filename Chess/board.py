@@ -3,8 +3,8 @@ from typing import cast, Union
 
 import numpy as np
 
-from move import Move
-from pieces import Piece, Rook, Knight, Bishop, Queen, King, Pawn, Empty
+from Chess.move import Move
+from Chess.pieces import Piece, Rook, Knight, Bishop, Queen, King, Pawn, Empty
 
 
 class Board:
@@ -121,7 +121,39 @@ class Board:
         # debug logging
         print(f"updated index for undo: {self.piece_index}")
 
+    def current_fen(self):
+        """
+        Convert the current board state into a "FEN" string.  The FEN codifies which pieces are where for the entire
+        board and is a standard notation we can use to compare with other engines or online sources.
+
+        see: https://www.chess.com/terms/fen-chess for additional information
+        :return: The FEN string
+        """
+        fen = ""
+        for row in self.board:
+            empty_count = 0
+            for piece in row:
+                if isinstance(piece, Empty):
+                    empty_count += 1
+                else:
+                    if empty_count > 0:
+                        fen += str(empty_count)
+                        empty_count = 0
+                    fen += piece.get_chess_notation()
+            if empty_count > 0:
+                fen += str(empty_count)
+            fen += "/"
+        fen = fen[:-1]  # remove the trailing "/"
+        fen += " w " if self.white_to_move else " b "
+        fen += "- - 0 1"  # placeholder for castling rights, en passant square, and halfmove and fullmove counters
+        return fen
+
     def __str__(self):
+        """
+        convert the current board state into a semi-human readable string.  to compare different states together, the
+        FEN string is a better option
+        :return: a string representation of the board
+        """
         output = ''
         for r in range(len(self.board)):
             for c in range(len(self.board[r])):

@@ -49,9 +49,14 @@ class Piece(ABC):
         # noinspection PyTypeChecker
         return np.array([int(id_str[-2]), int(id_str[-1])], dtype=np.int8)
 
-
     def full_name(self) -> str:
         return f'{self.color}{self.name}'
+
+    def get_chess_notation(self) -> str:
+        if self.color == 'w':
+            return self.name.upper()
+        else:
+            return self.name.lower()
 
     def __str__(self):
         return self.full_name()
@@ -87,7 +92,7 @@ class Pawn(Piece):
                              directions: np.ndarray,
                              is_in_start: bool,
                              capture_color: str) -> list:
-        from move import Move
+        from Chess.move import Move
         moves: list = []
 
         for direction in directions:
