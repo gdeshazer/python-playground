@@ -32,8 +32,8 @@ class Move:
         elif isinstance(board, list):
             start_piece_string = board[self.start_position[0]][self.start_position[1]]
             end_piece_string = board[self.end_position[0]][self.end_position[1]]
-            self.piece: Piece = Piece.from_str(start_piece_string)
-            self.capture: Piece = Piece.from_str(end_piece_string)
+            self.piece: Piece = Piece.from_str(start_piece_string, self.start_position)
+            self.capture: Piece = Piece.from_str(end_piece_string, self.end_position)
 
         self.move_id: int = self.start_position[0] * 1000 + \
                             self.start_position[1] * 100 + \

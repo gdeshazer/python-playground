@@ -1,5 +1,5 @@
 import os
-from typing import cast, Union
+from typing import Union
 
 import numpy as np
 
@@ -10,24 +10,27 @@ from Chess.pieces import Piece, Rook, Knight, Bishop, Queen, King, Pawn, Empty
 class Board:
 
     def __init__(self) -> None:
+        self.white_king: King = King('w', [7, 4])
+        self.black_king: King = King('b', [0, 4])
+
         # whenever a move is made, the move should ultimately be propagated to this two-dimensional list.  this
         # ultimately is what keeps track of what piece is where and which squares are currently occupied
         self.board: list[list[Piece]] = [
-            [Rook('b'), Knight('b'), Bishop('b'), Queen('b'), King('b'), Bishop('b'), Knight('b'), Rook('b')],
+            [Rook('b'), Knight('b'), Bishop('b'), Queen('b'), self.black_king, Bishop('b'), Knight('b'), Rook('b')],
             [Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b'), Pawn('b')],
             [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
             [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
             [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
             [Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty(), Empty()],
             [Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w'), Pawn('w')],
-            [Rook('w'), Knight('w'), Bishop('w'), Queen('w'), King('w'), Bishop('w'), Knight('w'), Rook('w')],
+            [Rook('w'), Knight('w'), Bishop('w'), Queen('w'), self.white_king, Bishop('w'), Knight('w'), Rook('w')],
         ]
         self.piece_index: dict[str, Piece] = {}
         self.white_to_move: bool = True
         self.move_log: list[Move] = []
+
+        # todo: maybe use a dictionary for this?
         self.valid_moves: list[Move] = []
-        self.white_king: King = cast(King, self.board[7][4])
-        self.black_king: King = cast(King, self.board[0][4])
 
         self.rebuild_piece_index()
         self.get_all_valid_moves()
@@ -57,7 +60,7 @@ class Board:
                     insert_column += int(row_str[c])
                 else:
                     color = 'w' if row_str[c].isupper() else 'b'
-                    piece = Piece.from_str(f'{color}{row_str[c]}')
+                    piece = Piece.from_str(f'{color}{row_str[c]}', [row, insert_column])
                     board.board[row][insert_column] = piece
 
                     if isinstance(piece, King):
@@ -105,9 +108,19 @@ class Board:
             self.move_log.append(v_move)
             self.update_index(v_move)
 
-            move_made = True
+            # since we need the king location to figure out pins/checks, we need to just make sure we update the kings
+            # position.  it might be worth doing this for all pieces instead of having the board variable for it, but for
+            # now this seems like an easy option
+            if isinstance(v_move.piece, King):
+                v_move.piece.position = v_move.end_position
 
+            # it's tempting to do the pin/check validation in the pieces themselves, but in order to make that work you
+            # would need each piece to check one move set ahead which could be expensive to do on every move made in
+            # addition to eventually having the engine pick moves for black to make
+            self.find_pins_and_checks()
             self.get_all_valid_moves()
+
+            move_made = True
 
             break
 
@@ -127,17 +140,96 @@ class Board:
         self.white_to_move = not self.white_to_move
         print(f"Undid move: {move}")
 
+    def find_pins_and_checks(self) -> list:
+        directions = Piece.ALL_DIRECTIONS
+        magnitudes = np.arange(1, 8)
+        king = self.current_king()
+        start = king.position
+
+        pins = []
+
+        # moving in all directions away from the king, check for:
+        # - friendly piece (but if there are two in the same direction skip to next direction)
+        # - enemy piece
+        #     - if enemy can attack and we found a friendly piece in the way, that friendly piece is pinned
+        #     - if the enemy can attack and there is not a friendly piece, we are in check
+        for direction in directions:
+            possible_pin = None
+            for magnitude in magnitudes:
+                end = np.add(start, np.multiply(direction, magnitude))
+
+                # we are outside the board
+                if np.any(end > 7) or np.any(end < 0):
+                    break
+
+                target = self.piece_at(end)
+
+                if isinstance(target, Empty):
+                    continue
+
+                if target.color == king.color:
+                    if possible_pin is None:
+                        possible_pin = (target, direction)
+                    else:
+                        # go to next magnitude in this direction to check for attacking piece
+                        continue
+                else:
+                    is_king = magnitude == 1 and isinstance(target, King)
+                    can_attack = target.can_attack_in_direction(direction)
+
+                    if can_attack or is_king:
+                        if possible_pin is None:
+                            # todo might need to flip the direction of the vector here
+                            king.check_directions.append(direction)
+                            king.in_check = True
+                            break
+                        else:
+                            pins.append(possible_pin)
+                    else:
+                        break
+
+        # we have to check knights separately since they can hop pieces
+        for knight_direction in Knight.DIRECTIONS:
+            end = np.add(start, knight_direction)
+
+            # we are outside the board
+            if np.any(end > 7) or np.any(end < 0):
+                break
+
+            target = self.piece_at(end)
+
+            if isinstance(target, Knight) and target.color != king.color:
+                king.in_check = True
+                king.check_directions.append(knight_direction)
+
+        # todo: not sure if better to tell a piece it is pinned, or if better to return pin list
+        for pin in pins:
+            pin[0].is_pinned = True
+
+            # we need to flip the pin direction to actually represent the direction the piece could potentially move in
+            pin[0].pin_direction = np.multiply(pin[1], -1)
+
+        return pins
+
     def get_all_valid_moves(self):
         # we need to clear out the previous set of moves since we are switching turns and will have a different set of
         # moves to manage
         self.valid_moves = []
         color_to_move = 'w' if self.white_to_move else 'b'
+        king = self.current_king()
+
+        if king.in_check and len(king.check_directions) > 1:
+            self.valid_moves = king.valid_moves(self, king.position)
+            return
 
         # instead of iterating through the entire board, lets only generate moves for the pieces in our index
         matching_ids = filter(lambda key: key[0] == color_to_move, self.piece_index.keys())
         for piece_id in matching_ids:
             piece = self.piece_index[piece_id]
             self.valid_moves += piece.valid_moves(self, piece.id_to_position(piece_id))
+
+    def current_king(self):
+        return self.white_king if self.white_to_move else self.black_king
 
     def piece_at(self, position: Union[np.ndarray, list[int]]) -> Piece:
         return self.board[position[0]][position[1]]

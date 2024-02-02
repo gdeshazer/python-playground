@@ -1,6 +1,9 @@
 """
-this class is responsible for storing all the information about the current stae of teh game.  also responsible for
-determining valid moves for the state and tracking a log of moves
+this class is responsible for storing all the information about the current state of the game.  also responsible for
+determining valid moves for the state and tracking a log of moves.
+
+The initial implementation for the board lives here, and is in the process of being migrated to the board.py file
+instead in an effort to try and make the code a bit easier to follow.
 """
 from typing import List, Tuple, Union
 

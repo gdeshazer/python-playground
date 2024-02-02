@@ -78,6 +78,21 @@ class TestBoard(unittest.TestCase):
         move_made = self.board.make_move(move)
         self.assertFalse(move_made)
 
+    def test_several_sequential_moves(self):
+        moves = [
+            ((6, 3), (4, 3)),
+            ((1, 3), (3, 3)),
+            ((7, 1), (5, 2)),
+            ((0, 2), (4, 6)),
+            ((6, 7), (5, 7))
+        ]
+
+        for move in moves:
+            move_made = self.board.make_move(Move.from_clicks(move[0], move[1], self.board))
+            self.assertTrue(move_made)
+
+        self.assertEqual("rn1qkbnr/ppp1pppp/8/3p4/3P2b1/2N4P/PPP1PPP1/R1BQKBNR b - - 0 1", self.board.current_fen())
+
     def test_white_bishop_moves_up_left_diag(self):
         expected_fens = ["8/8/8/8/8/8/6B1/8 b - - 0 1",
                          "8/8/8/8/8/5B2/8/8 b - - 0 1",
@@ -688,6 +703,14 @@ class TestBoard(unittest.TestCase):
     def test_king_in_check(self):
         test = [
             {
+                'name': 'king double checked - only king can move',
+                'start_fen': '8/1k6/3r4/8/3K2r1/3B4/8/8 w - - 0 1',
+                'piece_to_move': [4, 3],
+                'direction': [-1, 1],
+                'can_move': True,
+                'end_fen': '8/1k6/3r4/4K3/6r1/3B4/8/8 b - - 0 1'
+            },
+            {
                 'name': 'king checked - only king can move',
                 'start_fen': '8/1k6/3r4/8/3K4/3B4/8/8 w - - 0 1',
                 'piece_to_move': [5, 3],
@@ -743,6 +766,36 @@ class TestBoard(unittest.TestCase):
         self.board = Board.new_from_fen("8/1k6/3r4/8/8/3B4/3K4/8 w - - 0 1")
         move = Move.from_clicks((5, 3), (4, 4), self.board)
         self.assertFalse(self.board.make_move(move))
+
+    def test_pinned_bishop_moves_in_two_directions(self):
+        tests = [
+            {
+                "name": "bishop-captures",
+                "start": (2, 2),
+                "end": (4, 0),
+                "end_fen": "4k3/8/8/8/b7/8/8/4K3 w - - 0 1"
+            },
+            {
+                "name": "bishop-slide-down",
+                "start": (2, 2),
+                "end": (3, 1),
+                "end_fen": "4k3/8/8/1b6/B7/8/8/4K3 w - - 0 1"
+            },
+            {
+                "name": "bishop-slide-up",
+                "start": (2, 2),
+                "end": (1, 3),
+                "end_fen": "4k3/3b4/8/8/B7/8/8/4K3 w - - 0 1"
+            },
+        ]
+
+        for test in tests:
+            with self.subTest(test['name']):
+                self.board = Board.new_from_fen("4k3/8/2b5/8/B7/8/8/4K3 b - - 0 1")
+                move = Move.from_clicks(test['start'], test['end'], self.board)
+                move_was_made = self.board.make_move(move)
+                self.assertTrue(move_was_made)
+                self.assertEqual(test['end_fen'], self.board.current_fen())
 
     def move_and_validate_directions(self, initial_fen, directions, expected_fens, start):
         for direction in directions:
