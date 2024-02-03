@@ -7,15 +7,20 @@ from Chess.chessEngine import GameState
 
 
 def run_operation(times, operation):
-    start_time = time.time()
+    start = time.perf_counter(), time.process_time()
 
     for _ in range(times):
         operation()
 
-    return time.time() - start_time
+    end = time.perf_counter(), time.process_time()
+    return end[0] - start[0], end[1] - start[1]
 
 
-class MyTestCase(unittest.TestCase):
+def print_result(attempts, func_name, run_time):
+    print(f'{attempts} attempts -> {func_name}: real {run_time[0]}\tcpu {run_time[1]}')
+
+
+class PerformanceComparisonTests(unittest.TestCase):
 
     def setUp(self):
         self.new_board = Board.new_from_fen("2k3r1/8/8/8/r7/3K4/8/1R5R w - - 0 1")
@@ -34,14 +39,14 @@ class MyTestCase(unittest.TestCase):
 
     def test_king_move_generation(self):
         def old_operation():
-            for attempts in [10, 100, 1000, 10000]:
+            for attempts in [10, 10, 100, 1000, 10000]:
                 old_generation = run_operation(attempts, self.run_old_king_generation)
-                print(f'{attempts} attempts -> old time: {old_generation}')
+                print_result(attempts, self.run_old_king_generation.__name__, old_generation)
 
         def new_operation():
-            for attempts in [10, 100, 1000, 10000]:
+            for attempts in [10, 10, 100, 1000, 10000]:
                 new_generation = run_operation(attempts, self.run_new_king_generation)
-                print(f'{attempts} attempts -> new time: {new_generation}')
+                print_result(attempts, self.run_new_king_generation.__name__, new_generation)
 
         old_thread = threading.Thread(target=old_operation)
         new_thread = threading.Thread(target=new_operation)
@@ -54,14 +59,14 @@ class MyTestCase(unittest.TestCase):
 
     def test_all_generation(self):
         def old_operation():
-            for attempts in [10, 100, 1000, 10000]:
+            for attempts in [10, 10, 100, 1000, 10000]:
                 old_generation = run_operation(attempts, self.run_old_generation)
-                print(f'{attempts} attempts -> old time: {old_generation}')
+                print_result(attempts, self.run_old_generation.__name__, old_generation)
 
         def new_operation():
-            for attempts in [10, 100, 1000, 10000]:
+            for attempts in [10, 10, 100, 1000, 10000]:
                 new_generation = run_operation(attempts, self.run_new_generation)
-                print(f'{attempts} attempts -> new time: {new_generation}')
+                print_result(attempts, self.run_new_generation.__name__, new_generation)
 
         old_thread = threading.Thread(target=old_operation)
         new_thread = threading.Thread(target=new_operation)
