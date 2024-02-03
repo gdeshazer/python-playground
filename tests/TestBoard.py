@@ -559,14 +559,14 @@ class TestBoard(unittest.TestCase):
             self.assertEqual("8/8/8/3p4/2prp3/3p3k/8/5K2 b - - 0 1", self.board.current_fen())
 
     def test_white_rook_captures(self):
-        expected_fens = ["8/8/8/3R4/2p1p3/3p3k/6K1/8 b - - 0 1",
-                         "8/8/8/3p4/2R1p3/3p3k/6K1/8 b - - 0 1",
-                         "8/8/8/3p4/2p1p3/3R3k/6K1/8 b - - 0 1",
-                         "8/8/8/3p4/2p1R3/3p3k/6K1/8 b - - 0 1"
+        expected_fens = ["8/8/8/3R4/2p1p3/3p3k/8/5K2 b - - 0 1",
+                         "8/8/8/3p4/2R1p3/3p3k/8/5K2 b - - 0 1",
+                         "8/8/8/3p4/2p1p3/3R3k/8/5K2 b - - 0 1",
+                         "8/8/8/3p4/2p1R3/3p3k/8/5K2 b - - 0 1"
                          ]
         directions = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], np.int8)
         start = np.array([4, 3])
-        self.move_and_validate_directions("8/8/8/3p4/2pRp3/3p3k/6K1/8 w - - 0 1",
+        self.move_and_validate_directions("8/8/8/3p4/2pRp3/3p3k/8/5K2 w - - 0 1",
                                           directions,
                                           expected_fens,
                                           start)
@@ -652,9 +652,11 @@ class TestBoard(unittest.TestCase):
         directions = np.array([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], np.int8)
         start = [4, 4]
         for direction in directions:
-            self.board = Board.new_from_fen("8/8/8/8/4K3/8/8/8 w - - 0 1")
+            self.board = Board.new_from_fen("p7/8/8/8/4K3/8/8/8 w - - 0 1")
             end = np.add(direction, start)
-            expected_fen = self.generate_fen('K', end, 'b')
+
+            # the generate fen method could be updated to include an additional piece, but this seems easier for now
+            expected_fen = "p7" + self.generate_fen('K', end, 'b')[1:]
             move = Move(start, end, direction, self.board)
 
             self.assertTrue(self.board.make_move(move))
@@ -796,6 +798,11 @@ class TestBoard(unittest.TestCase):
                 move_was_made = self.board.make_move(move)
                 self.assertTrue(move_was_made)
                 self.assertEqual(test['end_fen'], self.board.current_fen())
+
+    def test_pinned_pawn_cannot_move(self):
+        self.board = Board.new_from_fen("3k4/8/8/b7/8/8/3P4/4K3 w - - 0 1")
+        move = Move.from_clicks((6, 3), (5, 3), self.board)
+        self.assertFalse(self.board.make_move(move))
 
     def move_and_validate_directions(self, initial_fen, directions, expected_fens, start):
         for direction in directions:

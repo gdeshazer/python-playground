@@ -114,10 +114,6 @@ class Board:
             if isinstance(v_move.piece, King):
                 v_move.piece.position = v_move.end_position
 
-            # it's tempting to do the pin/check validation in the pieces themselves, but in order to make that work you
-            # would need each piece to check one move set ahead which could be expensive to do on every move made in
-            # addition to eventually having the engine pick moves for black to make
-            self.find_pins_and_checks()
             self.get_all_valid_moves()
 
             move_made = True
@@ -140,6 +136,30 @@ class Board:
         self.white_to_move = not self.white_to_move
         print(f"Undid move: {move}")
 
+    def get_all_valid_moves(self):
+        # it's tempting to do the pin/check validation in the pieces themselves, but in order to make that work you
+        # would need each piece to check one move set ahead which could be expensive to do on every move made in
+        # addition to eventually having the engine pick moves for black to make
+        self.find_pins_and_checks()
+
+        # we need to clear out the previous set of moves since we are switching turns and will have a different set of
+        # moves to manage
+        self.valid_moves = []
+        color_to_move = 'w' if self.white_to_move else 'b'
+        king = self.current_king()
+
+        if king.in_check and len(king.check_directions) > 1:
+            self.valid_moves = king.valid_moves(self, king.position)
+            return
+
+        # todo: need to add code which limits valid moves to those which would take a king out of check (if the king is
+        #  not in double check)
+        # instead of iterating through the entire board, lets only generate moves for the pieces in our index
+        matching_ids = filter(lambda key: key[0] == color_to_move, self.piece_index.keys())
+        for piece_id in matching_ids:
+            piece = self.piece_index[piece_id]
+            self.valid_moves += piece.valid_moves(self, piece.id_to_position(piece_id))
+
     def find_pins_and_checks(self) -> list:
         directions = Piece.ALL_DIRECTIONS
         magnitudes = np.arange(1, 8)
@@ -156,6 +176,7 @@ class Board:
         for direction in directions:
             possible_pin = None
             for magnitude in magnitudes:
+                # todo: maybe move this into a function?
                 end = np.add(start, np.multiply(direction, magnitude))
 
                 # we are outside the board
@@ -205,28 +226,9 @@ class Board:
         # todo: not sure if better to tell a piece it is pinned, or if better to return pin list
         for pin in pins:
             pin[0].is_pinned = True
-
-            # we need to flip the pin direction to actually represent the direction the piece could potentially move in
-            pin[0].pin_direction = np.multiply(pin[1], -1)
+            pin[0].pin_direction = pin[1]
 
         return pins
-
-    def get_all_valid_moves(self):
-        # we need to clear out the previous set of moves since we are switching turns and will have a different set of
-        # moves to manage
-        self.valid_moves = []
-        color_to_move = 'w' if self.white_to_move else 'b'
-        king = self.current_king()
-
-        if king.in_check and len(king.check_directions) > 1:
-            self.valid_moves = king.valid_moves(self, king.position)
-            return
-
-        # instead of iterating through the entire board, lets only generate moves for the pieces in our index
-        matching_ids = filter(lambda key: key[0] == color_to_move, self.piece_index.keys())
-        for piece_id in matching_ids:
-            piece = self.piece_index[piece_id]
-            self.valid_moves += piece.valid_moves(self, piece.id_to_position(piece_id))
 
     def current_king(self):
         return self.white_king if self.white_to_move else self.black_king

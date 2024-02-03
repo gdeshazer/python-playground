@@ -54,8 +54,9 @@ class Piece(ABC):
     def magnitudes(self):
         pass
 
-    # todo: this could be faster if we used unit vectors for everything and just did a quick lookup
     def can_attack_in_direction(self, direction) -> bool:
+        # turns out using the cross product for this operation is really fast compared to checking if the unit direction
+        # vector is contained in the array of unit direction vectors the piece could move in
         for attack_direction in self.attack_directions():
             # we have two parallel arrays
             cross_product = np.cross(attack_direction, direction)
@@ -68,6 +69,7 @@ class Piece(ABC):
 
         return False
 
+    # todo: might be able to make this more efficient if we were to memoize this method relative to its inputs
     def can_attack_square(self, current_position, target, board):
         """
         the goal of this function is to determine if the current piece at some current position can capture a piece on
@@ -87,12 +89,13 @@ class Piece(ABC):
               square
         """
         target_direction = np.subtract(target, current_position)
-        if target_direction[0] == 0:
-            unit_vector_dir = target_direction[1]
-        elif target_direction[1] == 0:
-            unit_vector_dir = target_direction[0]
-        else:
-            unit_vector_dir = target_direction / np.linalg.norm(target_direction)
+
+        # this might seem strange, but in cases where we are looking ahead a move (like in the case of the king) this
+        # could happen when the king could move to the current square occupied by the current piece.
+        if np.array_equal(target_direction, target):
+            return False
+
+        unit_vector_dir = target_direction / np.linalg.norm(target_direction)
 
         if not self.can_attack_in_direction(target_direction):
             return False
@@ -160,9 +163,13 @@ class Piece(ABC):
         from Chess.move import Move
         moves = []
         enemy_color = 'b' if self.color == 'w' else 'w'
-        directions_to_move = directions if not self.is_pinned else self.pin_direction
+        if not self.is_pinned:
+            directions_to_move = directions
+        else:
+            # todo: this could be a problem if we flip the vector and the piece can't move in the opposite direction
+            directions_to_move = [self.pin_direction, np.multiply(self.pin_direction, -1)]
 
-        for direction in directions:
+        for direction in directions_to_move:
             for magnitude in magnitudes:
                 dir_vector = np.multiply(direction, magnitude)
                 move_vector = np.add(start, dir_vector)
@@ -366,19 +373,25 @@ class King(Piece):
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
         possible_moves = self.build_moves_from_directions(position, self.ALL_DIRECTIONS, self.MAGNITUDES, board)
-        enemy_positions = filter(lambda key: key[0] != self.color, board.piece_index.keys())
+        enemy_positions = list(filter(lambda key: key[0] != self.color, board.piece_index.keys()))
 
+        # todo: would be kinda cool if we could figure out right off the bat if a given piece is too far away and just
+        #       eliminate it from the pool.  could save a few cycles of extra compute time later on
         valid_moves = []
         for move in possible_moves:
+            is_attacked = False
             for enemy_index in enemy_positions:
                 enemy: Piece = board.piece_index[enemy_index]
 
-                can_attack = enemy.can_attack_square(enemy.id_to_position(enemy_index), move.end_position, board)
+                is_attacked = is_attacked or enemy.can_attack_square(enemy.id_to_position(enemy_index),
+                                                                     move.end_position,
+                                                                     board)
 
-                if can_attack:
-                    continue
-                else:
-                    valid_moves.append(move)
+                if is_attacked:
+                    break
+
+            if not is_attacked:
+                valid_moves.append(move)
 
         return valid_moves
 
