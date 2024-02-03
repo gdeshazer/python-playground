@@ -145,20 +145,54 @@ class Board:
         # we need to clear out the previous set of moves since we are switching turns and will have a different set of
         # moves to manage
         self.valid_moves = []
-        color_to_move = 'w' if self.white_to_move else 'b'
         king = self.current_king()
 
-        if king.in_check and len(king.check_directions) > 1:
-            self.valid_moves = king.valid_moves(self, king.position)
-            return
+        if king.in_check:
+            if len(king.check_directions) > 1:
+                self.valid_moves = king.valid_moves(self, king.position)
+                return
 
-        # todo: need to add code which limits valid moves to those which would take a king out of check (if the king is
-        #  not in double check)
+            valid_squares = king.valid_positions_if_checked()
+
+            possible_moves = self.get_all_moves()
+            valid_moves = []
+            for move in possible_moves:
+                move_is_valid = self.is_in(move.end_position, valid_squares)
+
+                # if isinstance(move.piece, King):
+                # if the piece is a king, then we shouldn't let the king move in a direction which
+                if move_is_valid:
+                    valid_moves.append(move)
+                else:
+                    continue
+                # elif move_is_valid:
+                #     valid_moves.append(move)
+
+            self.valid_moves = valid_moves
+        else:
+            self.valid_moves = self.get_all_moves()
+
+        king.reset_check()
+        for piece_id in filter(lambda key: key[0] == king.color, self.piece_index.keys()):
+            self.piece_index[piece_id].reset_pin()
+
+    def is_in(self, target: np.ndarray, list_of_elements: list[np.ndarray]) -> bool:
+        for element in list_of_elements:
+            if np.array_equal(target, element):
+                return True
+        return False
+
+    def get_all_moves(self) -> list[Move]:
         # instead of iterating through the entire board, lets only generate moves for the pieces in our index
+        color_to_move = 'w' if self.white_to_move else 'b'
         matching_ids = filter(lambda key: key[0] == color_to_move, self.piece_index.keys())
+        valid_moves = []
+
         for piece_id in matching_ids:
             piece = self.piece_index[piece_id]
-            self.valid_moves += piece.valid_moves(self, piece.id_to_position(piece_id))
+            valid_moves += piece.valid_moves(self, piece.id_to_position(piece_id))
+
+        return valid_moves
 
     def find_pins_and_checks(self) -> list:
         directions = Piece.ALL_DIRECTIONS
@@ -195,10 +229,9 @@ class Board:
                         # go to next magnitude in this direction to check for attacking piece
                         continue
                 else:
-                    is_king = magnitude == 1 and isinstance(target, King)
-                    can_attack = target.can_attack_in_direction(direction)
+                    can_attack = target.can_attack_in_direction(direction) and magnitude in target.magnitudes()
 
-                    if can_attack or is_king:
+                    if can_attack:
                         if possible_pin is None:
                             # todo might need to flip the direction of the vector here
                             king.check_directions.append(direction)

@@ -1,3 +1,4 @@
+import math
 from abc import ABC, abstractmethod
 from typing import Union
 
@@ -16,6 +17,8 @@ class Piece(ABC):
         self.name = name
         self.is_pinned = False
         self.pin_direction = []
+        # may need to keep an eye on the size of this object.  the long the game is played the larger this will get
+        self._attacks_from_positions = {}
 
     @classmethod
     def from_str(cls, name: str, position) -> "Piece":
@@ -69,8 +72,7 @@ class Piece(ABC):
 
         return False
 
-    # todo: might be able to make this more efficient if we were to memoize this method relative to its inputs
-    def can_attack_square(self, current_position, target, board):
+    def can_attack_square(self, current_position, target, board) -> bool:
         """
         the goal of this function is to determine if the current piece at some current position can capture a piece on
         target square.
@@ -88,16 +90,27 @@ class Piece(ABC):
             - if we never hit the target, or we hit a piece before the target, then we know we can't attack the target
               square
         """
+        cache = self._known_attack(current_position, target)
+        if cache[0]:
+            return cache[1]
+
         target_direction = np.subtract(target, current_position)
+        target_magnitude = math.trunc(np.linalg.norm(target_direction))
+
+        if not np.any(self.magnitudes() > target_magnitude):
+            self._cache_attack(current_position, target, False)
+            return False
 
         # this might seem strange, but in cases where we are looking ahead a move (like in the case of the king) this
         # could happen when the king could move to the current square occupied by the current piece.
         if np.array_equal(target_direction, target):
+            self._cache_attack(current_position, target, False)
             return False
 
         unit_vector_dir = target_direction / np.linalg.norm(target_direction)
 
         if not self.can_attack_in_direction(target_direction):
+            self._cache_attack(current_position, target, False)
             return False
 
         selected_directions = []
@@ -113,6 +126,7 @@ class Piece(ABC):
                 break
 
         if len(selected_directions) == 0:
+            self._cache_attack(current_position, target, False)
             return False
 
         for direction in selected_directions:
@@ -125,6 +139,7 @@ class Piece(ABC):
                     break
 
                 if np.array_equal(end_position, target):
+                    self._cache_attack(current_position, target, True)
                     return True
 
                 end_target = board.piece_at(end_position)
@@ -132,6 +147,21 @@ class Piece(ABC):
                 # if it isn't an empty piece we can know this direction is blocked, so we can go to the next direction
                 if not isinstance(end_target, Empty):
                     break
+
+    def _known_attack(self, current_position, target) -> tuple[bool, Union[bool, None]]:
+        key = self._attack_key(current_position, target)
+
+        if key in self._attacks_from_positions:
+            return True, self._attacks_from_positions[key]
+
+        return False, None
+
+    def _cache_attack(self, current_position, target, can_attack) -> None:
+        key = self._attack_key(current_position, target)
+        self._attacks_from_positions[key] = can_attack
+
+    def _attack_key(self, current_position, target) -> str:
+        return f'{current_position[0]}{current_position[1]}{target[0]}{target[1]}'
 
     def position_id(self, position: Union[np.ndarray, list[int]]) -> str:
         return f'{self.color}{self.name}-{position[0]}{position[1]}'
@@ -200,6 +230,10 @@ class Piece(ABC):
         self._attack_unit_vectors = [direction / np.linalg.norm(direction) for direction in self.attack_directions()]
         return self._attack_unit_vectors
 
+    def reset_pin(self):
+        self.pin_direction = []
+        self.is_pinned = False
+
     def __str__(self):
         return self.full_name()
 
@@ -215,7 +249,7 @@ class Empty(Piece):
         return np.array([])
 
     def magnitudes(self):
-        return []
+        return np.array([])
 
 
 class Pawn(Piece):
@@ -248,8 +282,13 @@ class Pawn(Piece):
                              capture_color: str) -> list:
         from Chess.move import Move
         moves: list = []
+        if not self.is_pinned:
+            directions_to_move = directions
+        else:
+            # todo: this could be a problem if we flip the vector and the piece can't move in the opposite direction
+            directions_to_move = [self.pin_direction, np.multiply(self.pin_direction, -1)]
 
-        for direction in directions:
+        for direction in directions_to_move:
             direction_product = np.prod(direction)
             endpoint = np.add(start, direction)
 
@@ -279,7 +318,7 @@ class Pawn(Piece):
         return moves
 
     def magnitudes(self):
-        return [1]
+        return np.array([1])
 
 
 class Bishop(Piece):
@@ -368,7 +407,6 @@ class King(Piece):
         self.in_check = False
         self.check_directions = []
         self.position = position
-        self._valid_positions = []
         self._unit_vectors = []
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
@@ -398,28 +436,25 @@ class King(Piece):
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
 
-    def valid_positions_if_checked(self) -> list:
-        if len(self._valid_positions) > 0:
-            return self._valid_positions
-
+    def valid_positions_if_checked(self) -> list[np.ndarray]:
         if not self.in_check:
             return []
 
+        valid_positions = []
         for check_direction in self.check_directions:
             for magnitude in np.arange(1, 8):
-                position = np.multiply(check_direction, magnitude)
+                position = np.add(self.position, np.multiply(check_direction, magnitude))
 
                 if np.any(position > 7) or np.any(position < 0):
                     break
 
-                self._valid_positions += position
+                valid_positions.append(position)
 
-        return self._valid_positions
+        return valid_positions
 
     def reset_check(self) -> None:
         self.in_check = False
         self.check_directions = []
-        self._valid_positions = []
 
     def magnitudes(self):
         return self.MAGNITUDES

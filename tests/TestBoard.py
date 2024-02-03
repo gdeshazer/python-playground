@@ -631,19 +631,19 @@ class TestBoard(unittest.TestCase):
 
     def test_queen_captures(self):
         expected_fens = [
-            "8/8/8/2nQb3/2p1r3/2pkq3/7K/8 b - - 0 1",
-            "8/8/8/2Qnb3/2p1r3/2pkq3/7K/8 b - - 0 1",
-            "8/8/8/2nnb3/2Q1r3/2pkq3/7K/8 b - - 0 1",
-            "8/8/8/2nnb3/2p1r3/2Qkq3/7K/8 b - - 0 1",
-            "8/8/8/2nnb3/2p1r3/2pQq3/7K/8 b - - 0 1",
-            "8/8/8/2nnb3/2p1r3/2pkQ3/7K/8 b - - 0 1",
-            "8/8/8/2nnb3/2p1Q3/2pkq3/7K/8 b - - 0 1",
-            "8/8/8/2nnQ3/2p1r3/2pkq3/7K/8 b - - 0 1"
+            "8/8/8/2nQb3/2p1r3/2pkq3/8/7K b - - 0 1",
+            "8/8/8/2Qnb3/2p1r3/2pkq3/8/7K b - - 0 1",
+            "8/8/8/2nnb3/2Q1r3/2pkq3/8/7K b - - 0 1",
+            "8/8/8/2nnb3/2p1r3/2Qkq3/8/7K b - - 0 1",
+            "8/8/8/2nnb3/2p1r3/2pQq3/8/7K b - - 0 1",
+            "8/8/8/2nnb3/2p1r3/2pkQ3/8/7K b - - 0 1",
+            "8/8/8/2nnb3/2p1Q3/2pkq3/8/7K b - - 0 1",
+            "8/8/8/2nnQ3/2p1r3/2pkq3/8/7K b - - 0 1"
         ]
 
         directions = np.array([[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]], np.int8)
         start = [4, 3]
-        self.move_and_validate_directions("8/8/8/2nnb3/2pQr3/2pkq3/7K/8 w - - 0 1",
+        self.move_and_validate_directions("8/8/8/2nnb3/2pQr3/2pkq3/8/7K w - - 0 1",
                                           directions,
                                           expected_fens,
                                           start)
