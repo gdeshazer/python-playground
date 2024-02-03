@@ -548,7 +548,7 @@ class TestBoard(unittest.TestCase):
             self.assertEqual("8/8/8/3P4/2PRP3/3P3k/6K1/8 w - - 0 1", self.board.current_fen())
 
     def test_black_rook_cannot_hop(self):
-        self.board = Board.new_from_fen("8/8/8/3p4/2prp3/3p3k/6K1/8 b - - 0 1")
+        self.board = Board.new_from_fen("8/8/8/3p4/2prp3/3p3k/8/5K2 b - - 0 1")
         directions = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], np.int8)
         start = np.array([4, 3])
         for direction in directions:
@@ -556,7 +556,7 @@ class TestBoard(unittest.TestCase):
             move = Move(start, end, direction, self.board)
 
             self.assertFalse(self.board.make_move(move))
-            self.assertEqual("8/8/8/3p4/2prp3/3p3k/6K1/8 b - - 0 1", self.board.current_fen())
+            self.assertEqual("8/8/8/3p4/2prp3/3p3k/8/5K2 b - - 0 1", self.board.current_fen())
 
     def test_white_rook_captures(self):
         expected_fens = ["8/8/8/3R4/2p1p3/3p3k/6K1/8 b - - 0 1",
@@ -572,14 +572,14 @@ class TestBoard(unittest.TestCase):
                                           start)
 
     def test_black_rook_captures(self):
-        expected_fens = ["8/8/8/3r4/2P1P3/3P3k/6K1/8 w - - 0 1",
-                         "8/8/8/3P4/2r1P3/3P3k/6K1/8 w - - 0 1",
-                         "8/8/8/3P4/2P1P3/3r3k/6K1/8 w - - 0 1",
-                         "8/8/8/3P4/2P1r3/3P3k/6K1/8 w - - 0 1"
+        expected_fens = ["8/8/8/3r4/2P1P3/3P3k/8/5K2 w - - 0 1",
+                         "8/8/8/3P4/2r1P3/3P3k/8/5K2 w - - 0 1",
+                         "8/8/8/3P4/2P1P3/3r3k/8/5K2 w - - 0 1",
+                         "8/8/8/3P4/2P1r3/3P3k/8/5K2 w - - 0 1"
                          ]
         directions = np.array([[1, 0], [-1, 0], [0, 1], [0, -1]], np.int8)
         start = np.array([4, 3])
-        self.move_and_validate_directions("8/8/8/3P4/2PrP3/3P3k/6K1/8 b - - 0 1",
+        self.move_and_validate_directions("8/8/8/3P4/2PrP3/3P3k/8/5K2 b - - 0 1",
                                           directions,
                                           expected_fens,
                                           start)

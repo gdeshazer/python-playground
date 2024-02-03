@@ -11,6 +11,7 @@ class Piece(ABC):
     ALL_DIRECTIONS = np.concatenate((DIAGONALS, UP_DOWN, LEFT_RIGHT))
 
     def __init__(self, color: str, name: str) -> None:
+        self._attack_unit_vectors = []
         self.color = color
         self.name = name
         self.is_pinned = False
@@ -49,6 +50,11 @@ class Piece(ABC):
     def attack_directions(self) -> np.ndarray:
         pass
 
+    @abstractmethod
+    def magnitudes(self):
+        pass
+
+    # todo: this could be faster if we used unit vectors for everything and just did a quick lookup
     def can_attack_in_direction(self, direction) -> bool:
         for attack_direction in self.attack_directions():
             # we have two parallel arrays
@@ -61,6 +67,68 @@ class Piece(ABC):
                 return True
 
         return False
+
+    def can_attack_square(self, current_position, target, board):
+        """
+        the goal of this function is to determine if the current piece at some current position can capture a piece on
+        target square.
+
+        this is determined in a couple different steps:
+        1. if the piece can move in a direction parallel to the direction the target is in
+            - the direction to the target is determined by subtracting the target's coordinates from the current
+              coordinates (this gives us a 'vector' indicating how to get from current position to target)
+            - the piece can potentially move to the target if the direction is parallel with one or more of the current
+              pieces possible attack directions
+        2. Find which directions (at most there will only be two) which match the direction to the target, and then
+           generate coordinates from the current position along that direction until we either hit the target or we hit
+           some other piece
+            - if we hit the target then we know the piece can move to that target
+            - if we never hit the target, or we hit a piece before the target, then we know we can't attack the target
+              square
+        """
+        target_direction = np.subtract(target, current_position)
+        if target_direction[0] == 0:
+            unit_vector_dir = target_direction[1]
+        elif target_direction[1] == 0:
+            unit_vector_dir = target_direction[0]
+        else:
+            unit_vector_dir = target_direction / np.linalg.norm(target_direction)
+
+        if not self.can_attack_in_direction(target_direction):
+            return False
+
+        selected_directions = []
+        for direction in self.attack_directions():
+            unit_dir = direction / np.linalg.norm(direction)
+            inverse_dir = np.multiply(unit_dir, -1)
+
+            # in theory, we would only need to check one direction but i wasn't able to think of a good way to figure
+            # out how to determine what the sign of the direction should be (ie are we moving in a more positive
+            # direction or a more negative direction)
+            if np.array_equal(unit_vector_dir, unit_dir) or np.array_equal(unit_vector_dir, inverse_dir):
+                selected_directions.append(direction)
+                break
+
+        if len(selected_directions) == 0:
+            return False
+
+        for direction in selected_directions:
+            for magnitude in self.magnitudes():
+                dir_vector = np.multiply(direction, magnitude)
+                end_position = np.add(current_position, dir_vector)
+
+                # check out of bounds
+                if np.any(end_position > 7) or np.any(end_position < 0):
+                    break
+
+                if np.array_equal(end_position, target):
+                    return True
+
+                end_target = board.piece_at(end_position)
+
+                # if it isn't an empty piece we can know this direction is blocked, so we can go to the next direction
+                if not isinstance(end_target, Empty):
+                    break
 
     def position_id(self, position: Union[np.ndarray, list[int]]) -> str:
         return f'{self.color}{self.name}-{position[0]}{position[1]}'
@@ -92,6 +160,7 @@ class Piece(ABC):
         from Chess.move import Move
         moves = []
         enemy_color = 'b' if self.color == 'w' else 'w'
+        directions_to_move = directions if not self.is_pinned else self.pin_direction
 
         for direction in directions:
             for magnitude in magnitudes:
@@ -117,6 +186,13 @@ class Piece(ABC):
 
         return moves
 
+    def attack_unit_vectors(self):
+        if len(self._attack_unit_vectors) > 0:
+            return self._attack_unit_vectors
+
+        self._attack_unit_vectors = [direction / np.linalg.norm(direction) for direction in self.attack_directions()]
+        return self._attack_unit_vectors
+
     def __str__(self):
         return self.full_name()
 
@@ -130,6 +206,9 @@ class Empty(Piece):
 
     def attack_directions(self) -> np.ndarray:
         return np.array([])
+
+    def magnitudes(self):
+        return []
 
 
 class Pawn(Piece):
@@ -192,6 +271,9 @@ class Pawn(Piece):
 
         return moves
 
+    def magnitudes(self):
+        return [1]
+
 
 class Bishop(Piece):
     DIRECTIONS = Piece.DIAGONALS
@@ -205,6 +287,9 @@ class Bishop(Piece):
 
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
+
+    def magnitudes(self):
+        return self.MAGNITUDES
 
 
 class Knight(Piece):
@@ -229,6 +314,9 @@ class Knight(Piece):
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
 
+    def magnitudes(self):
+        return self.MAGNITUDES
+
 
 class Rook(Piece):
     DIRECTIONS = np.concatenate((Piece.UP_DOWN, Piece.LEFT_RIGHT))
@@ -242,6 +330,9 @@ class Rook(Piece):
 
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
+
+    def magnitudes(self):
+        return self.MAGNITUDES
 
 
 class Queen(Piece):
@@ -257,6 +348,9 @@ class Queen(Piece):
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
 
+    def magnitudes(self):
+        return self.MAGNITUDES
+
 
 class King(Piece):
     DIRECTIONS = Piece.ALL_DIRECTIONS
@@ -268,10 +362,25 @@ class King(Piece):
         self.check_directions = []
         self.position = position
         self._valid_positions = []
+        self._unit_vectors = []
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        # todo: need to ensure that the move being made does not place the king in check
-        return self.build_moves_from_directions(position, self.ALL_DIRECTIONS, self.MAGNITUDES, board)
+        possible_moves = self.build_moves_from_directions(position, self.ALL_DIRECTIONS, self.MAGNITUDES, board)
+        enemy_positions = filter(lambda key: key[0] != self.color, board.piece_index.keys())
+
+        valid_moves = []
+        for move in possible_moves:
+            for enemy_index in enemy_positions:
+                enemy: Piece = board.piece_index[enemy_index]
+
+                can_attack = enemy.can_attack_square(enemy.id_to_position(enemy_index), move.end_position, board)
+
+                if can_attack:
+                    continue
+                else:
+                    valid_moves.append(move)
+
+        return valid_moves
 
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
@@ -298,3 +407,6 @@ class King(Piece):
         self.in_check = False
         self.check_directions = []
         self._valid_positions = []
+
+    def magnitudes(self):
+        return self.MAGNITUDES
