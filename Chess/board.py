@@ -120,7 +120,7 @@ class Board:
 
             break
 
-        print(self.__str__())
+        print(f'successfully made move: {move_made}\n{self.__str__()}')
         return move_made
 
     def undo_move(self) -> None:
@@ -134,7 +134,8 @@ class Board:
         self.update_index_with_undo(move)
 
         self.white_to_move = not self.white_to_move
-        print(f"Undid move: {move}")
+        self.get_all_valid_moves()
+        print(f"Undid move: {move}\twhite_to_move: {self.white_to_move}")
 
     def get_all_valid_moves(self):
         # it's tempting to do the pin/check validation in the pieces themselves, but in order to make that work you
