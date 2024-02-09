@@ -160,14 +160,16 @@ class Board:
             for move in possible_moves:
                 move_is_valid = self.is_in(move.end_position, valid_squares)
 
-                # if isinstance(move.piece, King):
-                # if the piece is a king, then we shouldn't let the king move in a direction which
-                if move_is_valid:
+                # if the piece is a king, we should also allow the king to move out of check if possible. Since the king
+                # piece in theory has its own rules for generating moves, we should hopefully be able to just add the
+                # moves without double-checking
+                #
+                # Probably, this whole bit of logic should be moved into the pieces themselves, instead of having move
+                # validation logic in more than one place
+                if isinstance(move.piece, King) or move_is_valid:
                     valid_moves.append(move)
                 else:
                     continue
-                # elif move_is_valid:
-                #     valid_moves.append(move)
 
             self.valid_moves = valid_moves
         else:

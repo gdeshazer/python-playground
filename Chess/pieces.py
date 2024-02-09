@@ -97,7 +97,7 @@ class Piece(ABC):
         target_direction = np.subtract(target, current_position)
         target_magnitude = math.trunc(np.linalg.norm(target_direction))
 
-        if not np.any(self.magnitudes() > target_magnitude):
+        if not np.any(self.magnitudes() >= target_magnitude):
             self._cache_attack(current_position, target, False)
             return False
 
@@ -121,9 +121,8 @@ class Piece(ABC):
             # in theory, we would only need to check one direction but i wasn't able to think of a good way to figure
             # out how to determine what the sign of the direction should be (ie are we moving in a more positive
             # direction or a more negative direction)
-            if np.array_equal(unit_vector_dir, unit_dir) or np.array_equal(unit_vector_dir, inverse_dir):
+            if np.all(np.isclose(unit_vector_dir, unit_dir)) or np.all(np.isclose(unit_vector_dir, inverse_dir)):
                 selected_directions.append(direction)
-                break
 
         if len(selected_directions) == 0:
             self._cache_attack(current_position, target, False)
@@ -160,14 +159,16 @@ class Piece(ABC):
         key = self._attack_key(current_position, target)
         self._attacks_from_positions[key] = can_attack
 
-    def _attack_key(self, current_position, target) -> str:
+    @staticmethod
+    def _attack_key(current_position, target) -> str:
         return f'{current_position[0]}{current_position[1]}{target[0]}{target[1]}'
 
     def position_id(self, position: Union[np.ndarray, list[int]]) -> str:
         return f'{self.color}{self.name}-{position[0]}{position[1]}'
 
     # todo: there should be a better way to handle this to, maybe the piece should store it's current position?
-    def id_to_position(self, id_str: str) -> np.ndarray[np.int8]:
+    @staticmethod
+    def id_to_position(id_str: str) -> np.ndarray[np.int8]:
         # noinspection PyTypeChecker
         return np.array([int(id_str[-2]), int(id_str[-1])], dtype=np.int8)
 
@@ -349,10 +350,12 @@ class Knight(Piece):
         [-1, 2],
         [-1, -2]
     ], np.int8)
+    # this isn't really the correct magnitude value for the knight piece.
     MAGNITUDES = np.array([1])
 
     def __init__(self, color: str) -> None:
         super().__init__(color, 'N')
+        self._actual_magnitudes = np.array([], dtype=np.int8)
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
         return self.build_moves_from_directions(position, self.DIRECTIONS, self.MAGNITUDES, board)
@@ -360,8 +363,37 @@ class Knight(Piece):
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS
 
+    def can_attack_square(self, current_position, target, board) -> bool:
+        """
+        For knights, we have to take a different approach compared to the other pieces and this is because we know that
+        knights can only move to certain squares.  Given a current position for a knight, we can easily figure out
+        whether that square is one the knight can move to or not by just calculating the direction to the target, and if
+        the direction matches one of the directions the knight can move in, then we can attack the square, otherwise,
+        we cannot.
+        """
+        cache = self._known_attack(current_position, target)
+        if cache[0]:
+            return cache[1]
+
+        target_direction = np.subtract(target, current_position)
+
+        for direction in self.DIRECTIONS:
+            if np.array_equal(target_direction, direction):
+                self._cache_attack(current_position, target, True)
+                return True
+
+        # we've exhausted all options, so we must not be able to attack the square
+        self._cache_attack(current_position, target, False)
+        return False
+
     def magnitudes(self):
-        return self.MAGNITUDES
+        if len(self._actual_magnitudes) == 0:
+            for direction in self.DIRECTIONS:
+                magnitude = int(math.trunc(np.linalg.norm(direction)))
+                if not np.any(self._actual_magnitudes == magnitude):
+                    self._actual_magnitudes = np.append(self._actual_magnitudes, magnitude)
+
+        return self._actual_magnitudes
 
 
 class Rook(Piece):

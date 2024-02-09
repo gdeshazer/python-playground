@@ -721,6 +721,22 @@ class TestBoard(unittest.TestCase):
                 'end_fen': '8/1k6/3r4/8/3K4/3B4/8/8 w - - 0 1'
             },
             {
+                'name': "king checked - king can't move in direction of check",
+                'start_fen': 'rnbqkbnr/ppp2ppp/8/1B1pp3/3PP3/8/PPP2PPP/RNBQK1NR b - - 0 1',
+                'piece_to_move': [0, 4],
+                'direction': [1, -1],
+                'can_move': False,
+                'end_fen': 'rnbqkbnr/ppp2ppp/8/1B1pp3/3PP3/8/PPP2PPP/RNBQK1NR b - - 0 1'
+            },
+            {
+                'name': 'king checked - king can move out of check',
+                'start_fen': 'rnbqkbnr/ppp2ppp/8/1B1pp3/3PP3/8/PPP2PPP/RNBQK1NR b - - 0 1',
+                'piece_to_move': [0, 4],
+                'direction': [1, 0],
+                'can_move': True,
+                'end_fen': 'rnbq1bnr/ppp1kppp/8/1B1pp3/3PP3/8/PPP2PPP/RNBQK1NR w - - 0 1'
+            },
+            {
                 'name': 'king checked - can capture with other',
                 'start_fen': '8/1k6/3r4/8/3K4/6B1/8/8 w - - 0 1',
                 'piece_to_move': [5, 6],
