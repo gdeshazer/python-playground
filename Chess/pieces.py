@@ -310,11 +310,18 @@ class Pawn(Piece):
                         additional_move = np.add(endpoint, direction)
                         new_target = board.piece_at([additional_move[0], additional_move[1]])
                         if isinstance(new_target, Empty):
-                            moves.append(Move(start, additional_move, direction, board))
+                            move = Move(start, additional_move, direction, board)
+                            move.set_passant_square(endpoint)
+                            moves.append(move)
 
             # moving in diagonals to capture
             elif target.color == capture_color:
                 moves.append(Move(start, endpoint, direction, board))
+            elif len(board.passant_square) > 0 and np.array_equal(board.passant_square, endpoint):
+                passant_capture = np.add(start, np.array([0, direction[1]]))
+                move = Move(start, endpoint, direction, board)
+                move.set_passant_capture(passant_capture, board)
+                moves.append(move)
 
         return moves
 

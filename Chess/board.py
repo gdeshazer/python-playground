@@ -3,7 +3,7 @@ from typing import Union
 
 import numpy as np
 
-from Chess.move import Move
+from Chess.move import Move, get_rank_file
 from Chess.pieces import Piece, Rook, Knight, Bishop, Queen, King, Pawn, Empty
 
 
@@ -31,6 +31,8 @@ class Board:
 
         # todo: maybe use a dictionary for this?
         self.valid_moves: list[Move] = []
+
+        self.passant_square = []
 
         self.rebuild_piece_index()
         self.get_all_valid_moves()
@@ -108,6 +110,15 @@ class Board:
             self.move_log.append(v_move)
             self.update_index(v_move)
 
+            if v_move.exposes_en_passant():
+                self.passant_square = v_move.en_passant
+            else:
+                self.passant_square = []
+
+            if v_move.is_en_passant_capture():
+                self.board[v_move.en_passant[0]][v_move.en_passant[1]] = Empty()
+                self.passant_square = []
+
             # since we need the king location to figure out pins/checks, we need to just make sure we update the kings
             # position.  it might be worth doing this for all pieces instead of having the board variable for it, but for
             # now this seems like an easy option
@@ -128,8 +139,14 @@ class Board:
             return
 
         move = self.move_log.pop()
-        self.board[move.start_row()][move.start_col()] = move.piece
-        self.board[move.end_row()][move.end_col()] = move.capture
+
+        if move.is_en_passant_capture():
+            self.board[move.start_row()][move.start_col()] = move.piece
+            self.board[move.en_passant[0]][move.en_passant[1]] = move.capture
+            self.board[move.end_position[0]][move.end_position[1]] = Empty()
+        else:
+            self.board[move.start_row()][move.start_col()] = move.piece
+            self.board[move.end_row()][move.end_col()] = move.capture
 
         self.update_index_with_undo(move)
 
@@ -279,7 +296,11 @@ class Board:
         self.piece_index.pop(start_id)
 
         if not isinstance(move.capture, Empty):
-            capture_id = move.capture.position_id(move.end_position)
+            if move.is_en_passant_capture():
+                capture_id = move.capture.position_id(move.en_passant)
+            else:
+                capture_id = move.capture.position_id(move.end_position)
+
             self.piece_index.pop(capture_id)
 
         # debug logging
@@ -287,13 +308,17 @@ class Board:
 
     def update_index_with_undo(self, move):
         original_id = move.piece.position_id(move.start_position)
+
         undone_id = move.piece.position_id(move.end_position)
 
         self.piece_index.pop(undone_id, None)
         self.piece_index[original_id] = move.piece
 
         if not isinstance(move.capture, Empty):
-            capture_id = move.capture.position_id(move.end_position)
+            if move.is_en_passant_capture():
+                capture_id = move.capture.position_id(move.en_passant)
+            else:
+                capture_id = move.capture.position_id(move.end_position)
             self.piece_index[capture_id] = move.capture
 
         # debug logging
@@ -323,7 +348,14 @@ class Board:
             fen += "/"
         fen = fen[:-1]  # remove the trailing "/"
         fen += " w " if self.white_to_move else " b "
-        fen += "- - 0 1"  # placeholder for castling rights, en passant square, and halfmove and fullmove counters
+        fen += "-"  # place holder for castling
+
+        if len(self.passant_square) > 0:
+            fen += f" {get_rank_file(self.passant_square)} "
+        else:
+            fen += " - "
+
+        fen += "0 1"  # halfmove and fullmove counters
         return fen
 
     def __str__(self):

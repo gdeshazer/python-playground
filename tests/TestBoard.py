@@ -820,6 +820,19 @@ class TestBoard(unittest.TestCase):
         move = Move.from_clicks((6, 3), (5, 3), self.board)
         self.assertFalse(self.board.make_move(move))
 
+    def test_en_passant(self):
+        moves = (
+            ((1, 3), (3, 3)),  # move black pawn up two space
+            ((3, 2), (2, 3))  # perform en passant capture
+        )
+
+        self.board = Board.new_from_fen("rnbqkbnr/pppp1p1p/6p1/2P1p3/4P3/8/PP1P1PPP/RNBQKBNR b - - 0 1")
+        for move in moves:
+            move_to_make = Move.from_clicks(move[0], move[1], self.board)
+            self.assertTrue(self.board.make_move(move_to_make))
+
+        self.assertEqual("rnbqkbnr/ppp2p1p/3P2p1/4p3/4P3/8/PP1P1PPP/RNBQKBNR b - - 0 1", self.board.current_fen())
+
     def move_and_validate_directions(self, initial_fen, directions, expected_fens, start):
         for direction in directions:
             self.board = Board.new_from_fen(initial_fen)
