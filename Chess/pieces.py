@@ -262,36 +262,27 @@ class Pawn(Piece):
 
     def __init__(self, color: str) -> None:
         super().__init__(color, 'P')
+        self.directions = self.WHITE_DIRECTIONS if color == 'w' else self.BLACK_DIRECTIONS
+        self.start_row = 6 if color == 'w' else 1
+        self.end_row = 0 if color == 'w' else 7
+        self._attack_direction = np.array([[-1, 1], [-1, -1]]) if color == 'w' else np.array([[1, 1], [1, -1]])
 
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
-        if self.color == 'w':
-            return self.calculate_pawn_moves(board, position, self.WHITE_DIRECTIONS, position[0] == 6, 'b')
-        elif self.color == 'b':
-            return self.calculate_pawn_moves(board, position, self.BLACK_DIRECTIONS, position[0] == 1, 'w')
-
-    def attack_directions(self) -> np.ndarray:
-        if self.color == 'w':
-            return np.array([[-1, 1], [-1, -1]])
-        else:
-            return np.array([[1, 1], [1, -1]])
-
-    def calculate_pawn_moves(self,
-                             board,
-                             start: np.ndarray[np.int8],
-                             directions: np.ndarray,
-                             is_in_start: bool,
-                             capture_color: str) -> list:
         from Chess.move import Move
+
+        capture_color = 'b' if self.color == 'w' else 'w'
+        in_start_row = self.start_row == position[0]
+
         moves: list = []
         if not self.is_pinned:
-            directions_to_move = directions
+            directions_to_move = self.directions
         else:
             # todo: this could be a problem if we flip the vector and the piece can't move in the opposite direction
             directions_to_move = [self.pin_direction, np.multiply(self.pin_direction, -1)]
 
         for direction in directions_to_move:
             direction_product = np.prod(direction)
-            endpoint = np.add(start, direction)
+            endpoint = np.add(position, direction)
 
             # we are outside the board
             if np.any(endpoint > 7) or np.any(endpoint < 0):
@@ -299,31 +290,40 @@ class Pawn(Piece):
 
             target = board.piece_at([endpoint[0], endpoint[1]])
 
+            move = Move(position, endpoint, direction, board)
+            move.is_promotion = self.end_row == endpoint[0]
+
             # we are moving vertically
             if direction_product == 0:
                 if isinstance(target, Empty):
-                    moves.append(Move(start, endpoint, direction, board))
-
-                    # pawns in their starting row can move two spaces forward, but they can't hop anything
-                    # so if we didn't add a move for the pawn to move forward once, we can't add one to move twice
-                    if is_in_start:
-                        additional_move = np.add(endpoint, direction)
-                        new_target = board.piece_at([additional_move[0], additional_move[1]])
-                        if isinstance(new_target, Empty):
-                            move = Move(start, additional_move, direction, board)
-                            move.set_passant_square(endpoint)
-                            moves.append(move)
+                    moves.append(move)
+                    self.check_double_move(board, direction, endpoint, in_start_row, moves, position)
 
             # moving in diagonals to capture
             elif target.color == capture_color:
-                moves.append(Move(start, endpoint, direction, board))
+                moves.append(move)
             elif len(board.passant_square) > 0 and np.array_equal(board.passant_square, endpoint):
-                passant_capture = np.add(start, np.array([0, direction[1]]))
-                move = Move(start, endpoint, direction, board)
+                passant_capture = np.add(position, np.array([0, direction[1]]))
                 move.set_passant_capture(passant_capture, board)
                 moves.append(move)
 
         return moves
+
+    def attack_directions(self) -> np.ndarray:
+        return self._attack_direction
+
+    @staticmethod
+    def check_double_move(board, direction, endpoint, is_in_start, moves, start):
+        from Chess.move import Move
+        # pawns in their starting row can move two spaces forward, but they can't hop anything
+        # so if we didn't add a move for the pawn to move forward once, we can't add one to move twice
+        if is_in_start:
+            additional_move = np.add(endpoint, direction)
+            new_target = board.piece_at([additional_move[0], additional_move[1]])
+            if isinstance(new_target, Empty):
+                skip_row_move = Move(start, additional_move, direction, board)
+                skip_row_move.set_passant_square(endpoint)
+                moves.append(skip_row_move)
 
     def magnitudes(self):
         return np.array([1])

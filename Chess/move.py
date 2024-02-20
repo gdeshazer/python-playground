@@ -29,6 +29,7 @@ class Move:
         self.end_position: np.ndarray[np.int8] = end_square
         self.direction: np.ndarray[np.int8] = direction
         self.en_passant: Union[None, np.ndarray[np.int8]] = None
+        self.is_promotion: bool = False
 
         # while it would be better to import the board type here, we get a circular import warning which python
         # can't figure out.  once the new board's logic is validated to be functional, we might be able to switch back

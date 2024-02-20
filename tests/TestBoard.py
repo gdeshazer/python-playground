@@ -40,7 +40,7 @@ class TestBoard(unittest.TestCase):
 
         fen = self.board.current_fen()
 
-        self.assertEqual("rnbqkbnr/8/8/pppppppp/PPPPPPPP/8/8/RNBQKBNR w - - 0 1", fen)
+        self.assertEqual("rnbqkbnr/8/8/pppppppp/PPPPPPPP/8/8/RNBQKBNR w - h6 0 1", fen)
 
     def test_white_pawn_capture(self):
         self.board = Board.new_from_fen("rnbqkbnr/pppp1ppp/8/4p3/3P4/8/PPP1PPPP/RNBQKBNR w - e6 0 1")
@@ -77,6 +77,20 @@ class TestBoard(unittest.TestCase):
         move = Move.from_clicks((1, 0), (3, 0), self.board)
         move_made = self.board.make_move(move)
         self.assertFalse(move_made)
+
+    def test_white_pawn_promotion(self):
+        self.board = Board.new_from_fen("7k/2P5/8/8/8/8/8/7K w - - 0 1")
+        move = Move.from_clicks((1, 2), (0, 2), self.board)
+        move_made = self.board.make_move(move)
+        self.assertTrue(move_made)
+        self.assertEqual("2Q4k/8/8/8/8/8/8/7K b - - 0 1", self.board.current_fen())
+
+    def test_black_pawn_promotion(self):
+        self.board = Board.new_from_fen("7k/8/8/8/8/8/2p5/7K b - - 0 1")
+        move = Move.from_clicks((6, 2), (7, 2), self.board)
+        move_made = self.board.make_move(move)
+        self.assertTrue(move_made)
+        self.assertEqual("7k/8/8/8/8/8/8/2q4K w - - 0 1", self.board.current_fen())
 
     def test_several_sequential_moves(self):
         moves = [
