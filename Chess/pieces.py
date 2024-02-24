@@ -19,6 +19,7 @@ class Piece(ABC):
         self.pin_direction = []
         # may need to keep an eye on the size of this object.  the long the game is played the larger this will get
         self._attacks_from_positions = {}
+        self.move_count = 0
 
     @classmethod
     def from_str(cls, name: str, position) -> "Piece":
@@ -451,14 +452,16 @@ class King(Piece):
     def valid_moves(self, board, position: np.ndarray[np.int8]) -> list:
         possible_moves = self.build_moves_from_directions(position, self.ALL_DIRECTIONS, self.MAGNITUDES, board)
         enemy_positions = list(filter(lambda key: key[0] != self.color, board.piece_index.keys()))
+        enemy_tuples = list(map(lambda idx: (idx, board.piece_index[idx]), enemy_positions))
 
         # todo: would be kinda cool if we could figure out right off the bat if a given piece is too far away and just
         #       eliminate it from the pool.  could save a few cycles of extra compute time later on
         valid_moves = []
         for move in possible_moves:
             is_attacked = False
-            for enemy_index in enemy_positions:
-                enemy: Piece = board.piece_index[enemy_index]
+            for enemy_tuple in enemy_tuples:
+                enemy_index = enemy_tuple[0]
+                enemy = enemy_tuple[1]
 
                 is_attacked = is_attacked or enemy.can_attack_square(enemy.id_to_position(enemy_index),
                                                                      move.end_position,
@@ -470,7 +473,117 @@ class King(Piece):
             if not is_attacked:
                 valid_moves.append(move)
 
+        self.check_castling(valid_moves, board, enemy_tuples)
+
         return valid_moves
+
+    def check_castling(self, valid_moves, board, enemy_tuples) -> None:
+        from Chess.move import CastleMove
+        # castling has the following rules (see https://www.chess.com/terms/castling-chess):
+        #   - the king must not have been moved
+        #   - the rook must not have been moved
+        #   - the king cannot be in check
+        #   - the squares between the king and the rook must be empty
+        #   - the squares between the king and the rook cannot be under attack by enemy pieces
+
+        # if the king has moved, or is in check, we can't castle
+        if self.move_count > 0 or self.in_check:
+            return
+
+        row = 7 if self.color == 'w' else 0
+
+        directions = []
+
+        left_direction = np.array([0, -1])
+        right_direction = np.array([0, 1])
+
+        left_corner = np.array([row, 0])
+        right_corner = np.array([row, 7])
+
+        left_rook = board.piece_at(left_corner)
+        right_rook = board.piece_at(right_corner)
+
+        if isinstance(left_rook, Rook) and left_rook.move_count == 0:
+            directions.append(left_direction)
+
+        if isinstance(right_rook, Rook) and right_rook.move_count == 0:
+            directions.append(right_direction)
+
+        # moving in the possible directions we just found, check that all the squares are empty
+        squares_to_check: list[tuple[np.ndarray, np.ndarray]] = []
+        for direction in directions:
+            # in theory we only need to check the two squares the king would be moving, but when the king moves left
+            # there is an extra square between it and the rook it's castling with, which also needs to be empty, so
+            # we have to check at least 3 squares to be sure
+            for mag in range(1, 4):
+                vector = np.multiply(direction, mag)
+                target = np.add(self.position, vector)
+
+                # check out of bounds (just in case)
+                if np.any(target > 7) or np.any(target < 0):
+                    break
+
+                piece = board.piece_at(target)
+                if not isinstance(piece, Empty) and not isinstance(piece, Rook):
+                    # we can't castle if there's a piece in the way
+                    break
+
+                if isinstance(piece, Rook) or mag > 2:
+                    # we don't need to add the rook square specifically, and we don't care if the 3rd square can be
+                    # attacked, since it only matters if the king is moving through an attacked square
+                    continue
+                else:
+                    squares_to_check.append((target, direction))
+
+        # if we end up with a direction who had two valid squares, then we know that is a direction we can castle in
+        # so to check that, we loop through the squares we know about which already checked aren't under attack,
+        # and then add a value to the direction count which matches the direct the square is in relative to the king
+        left_direction_count = 0
+        right_direction_count = 0
+        for square in squares_to_check:
+            is_attacked = False
+            target = square[0]
+            direction = square[1]
+
+            # if an enemy can attack any of the squares in a given direction, we cannot castle in that direction
+            for enemy_tuple in enemy_tuples:
+                enemy_index = enemy_tuple[0]
+                enemy = enemy_tuple[1]
+
+                is_attacked = is_attacked or enemy.can_attack_square(enemy.id_to_position(enemy_index),
+                                                                     target,
+                                                                     board)
+
+                if is_attacked:
+                    break
+
+            if not is_attacked:
+                if np.array_equal(left_direction, direction):
+                    left_direction_count += 1
+                elif np.array_equal(right_direction, direction):
+                    right_direction_count += 1
+
+        if left_direction_count == 2:
+            king_target = np.array([row, 2])
+            rook_target = np.array([row, 3])
+
+            castle_move = CastleMove(self.position, king_target, left_direction, board)
+            castle_move.rook_start = left_corner
+            castle_move.rook_end = rook_target
+            castle_move.rook = left_rook
+
+            valid_moves.append(castle_move)
+
+        if right_direction_count == 2:
+            king_target = np.array([row, 6])
+            rook_target = np.array([row, 5])
+
+            castle_move = CastleMove(self.position, king_target, right_direction, board)
+            castle_move.rook_start = right_corner
+            castle_move.rook_end = rook_target
+            castle_move.rook = right_rook
+
+            valid_moves.append(castle_move)
 
     def attack_directions(self) -> np.ndarray:
         return self.DIRECTIONS

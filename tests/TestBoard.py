@@ -847,6 +847,20 @@ class TestBoard(unittest.TestCase):
 
         self.assertEqual("rnbqkbnr/ppp2p1p/3P2p1/4p3/4P3/8/PP1P1PPP/RNBQKBNR b - - 0 1", self.board.current_fen())
 
+    def test_white_castle_king_side(self):
+        self.board = Board.new_from_fen("rnbqkbnr/p7/1ppppppp/8/3PP3/2NBBN2/PPP1QPPP/R3K2R w - - 0 1")
+        move = Move.from_clicks((7, 4), (7, 6), self.board)
+        move_made = self.board.make_move(move)
+        self.assertTrue(move_made)
+        self.assertEqual("rnbqkbnr/p7/1ppppppp/8/3PP3/2NBBN2/PPP1QPPP/R4RK1 b - - 0 1", self.board.current_fen())
+
+    def test_white_castle_queen_side(self):
+        self.board = Board.new_from_fen("rnbqkbnr/p7/1ppppppp/8/3PP3/2NBBN2/PPP1QPPP/R3K2R w - - 0 1")
+        move = Move.from_clicks((7, 4), (7, 2), self.board)
+        move_made = self.board.make_move(move)
+        self.assertTrue(move_made)
+        self.assertEqual("rnbqkbnr/p7/1ppppppp/8/3PP3/2NBBN2/PPP1QPPP/2KR3R b - - 0 1", self.board.current_fen())
+
     def move_and_validate_directions(self, initial_fen, directions, expected_fens, start):
         for direction in directions:
             self.board = Board.new_from_fen(initial_fen)

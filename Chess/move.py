@@ -48,6 +48,50 @@ class Move:
                             self.end_position[0] * 10 + \
                             self.end_position[1]
 
+    # todo: having a move modify the internal state of the board seems a bit strange.  there could be a better way to
+    #       do this.  At least having this logic here allows for the move to actually do the movement logic, while the
+    #       board can worry about other things
+    def make_move(self, board):
+        from Chess.pieces import Empty, Queen, King
+
+        board.board[self.start_position[0]][self.start_position[1]] = Empty()
+        board.board[self.end_position[0]][self.end_position[1]] = self.piece
+
+        if self.exposes_en_passant():
+            board.passant_square = self.en_passant
+        else:
+            board.passant_square = []
+
+        if self.is_en_passant_capture():
+            board.board[self.en_passant[0]][self.en_passant[1]] = Empty()
+            board.passant_square = []
+
+        if self.is_promotion:
+            board.board[self.end_position[0]][self.end_position[1]] = Queen(self.piece.color)
+
+        # todo: should update the pieces to keep track of their position.  would probably make logic dealing with
+        #       where a piece is a bit easier in the future
+        # update the position of the king
+        if isinstance(self.piece, King):
+            self.piece.position = self.end_position
+
+        self.piece.move_count += 1
+
+    def undo(self, board):
+        from Chess.pieces import Empty, King
+        if self.is_en_passant_capture():
+            board.board[self.start_position[0]][self.start_position[1]] = self.piece
+            board.board[self.en_passant[0]][self.en_passant[1]] = self.capture
+            board.board[self.end_position[0]][self.end_position[1]] = Empty()
+        else:
+            board.board[self.start_position[0]][self.start_position[1]] = self.piece
+            board.board[self.end_position[0]][self.end_position[1]] = self.capture
+
+        if isinstance(self.piece, King):
+            self.piece.position = self.start_position
+
+        self.piece.move_count -= 1
+
     @classmethod
     def from_clicks(cls,
                     start_square: tuple[int, int],
@@ -99,3 +143,58 @@ class Move:
 
     def __str__(self):
         return f'MoveId: {self.move_id} | Piece: {self.piece.color}{self.piece.name} | Direction: {self.direction}'
+
+
+class CastleMove(Move):
+    def __init__(self,
+                 start_square: np.ndarray[np.int8],
+                 end_square: np.ndarray[np.int8],
+                 direction: np.ndarray[np.int8],
+                 board) -> None:
+        from Chess.pieces import Rook
+        super().__init__(start_square, end_square, direction, board)
+        self.is_castle: bool = True
+        self.rook_start = []
+        self.rook_end = []
+        self.rook: Union[Rook, None] = None
+
+    def make_move(self, board):
+        from Chess.pieces import Empty, King
+
+        if self.rook is None:
+            raise ValueError("Rook can't be None.  This is a problem in the engine itself")
+
+        board.board[self.start_position[0]][self.start_position[1]] = Empty()
+        board.board[self.end_position[0]][self.end_position[1]] = self.piece
+
+        board.board[self.rook_start[0]][self.rook_start[1]] = Empty()
+        board.board[self.rook_end[0]][self.rook_end[1]] = self.rook
+
+        self.piece.move_count += 1
+        self.rook.move_count += 1
+
+        # update the position of the king
+        if isinstance(self.piece, King):
+            self.piece.position = self.end_position
+
+    def undo(self, board):
+        from Chess.pieces import Empty, King
+
+        board.board[self.start_position[0]][self.start_position[1]] = self.piece
+        board.board[self.end_position[0]][self.end_position[1]] = Empty()
+
+        board.board[self.rook_start[0]][self.rook_start[1]] = self.rook
+        board.board[self.rook_end[0]][self.rook_end[1]] = Empty()
+
+        self.piece.move_count -= 1
+        self.rook.move_count -= 1
+
+        # update the position of the king
+        if isinstance(self.piece, King):
+            self.piece.position = self.start_position
+
+    def __eq__(self, other):
+        if isinstance(other, Move) or isinstance(other, CastleMove):
+            return self.move_id == other.move_id
+        else:
+            return False

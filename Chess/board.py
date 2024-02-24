@@ -104,33 +104,12 @@ class Board:
                 continue
 
             print(f"Executing move: {v_move}")
-            self.board[v_move.start_row()][v_move.start_col()] = Empty()
-            self.board[v_move.end_row()][v_move.end_col()] = v_move.piece
+            v_move.make_move(self)
             self.white_to_move = not self.white_to_move
             self.move_log.append(v_move)
             self.update_index(v_move)
 
-            if v_move.exposes_en_passant():
-                self.passant_square = v_move.en_passant
-            else:
-                self.passant_square = []
-
-            if v_move.is_en_passant_capture():
-                self.board[v_move.en_passant[0]][v_move.en_passant[1]] = Empty()
-                self.passant_square = []
-
-            if v_move.is_promotion:
-                # for now, pawn promotion will just be to queen.  in theory, it should be something that you can select
-                self.board[v_move.end_row()][v_move.end_col()] = Queen(v_move.piece.color)
-
-            # since we need the king location to figure out pins/checks, we need to just make sure we update the kings
-            # position.  it might be worth doing this for all pieces instead of having the board variable for it, but for
-            # now this seems like an easy option
-            if isinstance(v_move.piece, King):
-                v_move.piece.position = v_move.end_position
-
             self.get_all_valid_moves()
-
             move_made = True
 
             break
@@ -143,17 +122,8 @@ class Board:
             return
 
         move = self.move_log.pop()
-
-        if move.is_en_passant_capture():
-            self.board[move.start_row()][move.start_col()] = move.piece
-            self.board[move.en_passant[0]][move.en_passant[1]] = move.capture
-            self.board[move.end_position[0]][move.end_position[1]] = Empty()
-        else:
-            self.board[move.start_row()][move.start_col()] = move.piece
-            self.board[move.end_row()][move.end_col()] = move.capture
-
+        move.undo(self)
         self.update_index_with_undo(move)
-
         self.white_to_move = not self.white_to_move
         self.get_all_valid_moves()
         print(f"Undid move: {move}\twhite_to_move: {self.white_to_move}")
